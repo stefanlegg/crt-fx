@@ -121,6 +121,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 12px;
+  overflow: hidden;
 }
 
 .section-header {
@@ -205,10 +206,12 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .slider-row label {
-  flex: 0 0 90px;
+  flex: 0 0 72px;
   font-size: 11px;
   color: var(--text-dim);
   text-align: right;
@@ -244,11 +247,14 @@ body {
 }
 
 .slider-value {
-  flex: 0 0 42px;
+  flex: 0 0 50px;
   font-size: 11px;
   color: var(--accent2);
   text-align: right;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Select dropdown */
@@ -277,7 +283,7 @@ select:focus {
 }
 
 .dropdown-row label {
-  flex: 0 0 90px;
+  flex: 0 0 72px;
   font-size: 11px;
   color: var(--text-dim);
   text-align: right;
