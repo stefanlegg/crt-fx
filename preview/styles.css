@@ -101,7 +101,8 @@ body {
   background: var(--surface);
   border-left: 1px solid var(--border);
   overflow-y: auto;
-  padding: 16px;
+  overflow-x: hidden;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -120,8 +121,8 @@ body {
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 10px 12px;
-  overflow: hidden;
+  padding: 10px 10px;
+  min-width: 0;
 }
 
 .section-header {
@@ -205,20 +206,21 @@ body {
 .slider-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  overflow: hidden;
 }
 
 .slider-row label {
-  flex: 0 0 72px;
+  flex: 0 0 64px;
   font-size: 11px;
   color: var(--text-dim);
   text-align: right;
+  white-space: nowrap;
 }
 
 .slider-row input[type="range"] {
   flex: 1;
+  min-width: 0;
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
@@ -247,13 +249,11 @@ body {
 }
 
 .slider-value {
-  flex: 0 0 50px;
-  font-size: 11px;
+  flex: 0 0 44px;
+  font-size: 10px;
   color: var(--accent2);
   text-align: right;
   font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -283,10 +283,18 @@ select:focus {
 }
 
 .dropdown-row label {
-  flex: 0 0 72px;
+  flex: 0 0 64px;
   font-size: 11px;
   color: var(--text-dim);
   text-align: right;
+}
+
+.dropdown-row {
+  min-width: 0;
+}
+
+.dropdown-row select {
+  min-width: 0;
 }
 
 .dropdown-row select {
