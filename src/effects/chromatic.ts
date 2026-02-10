@@ -1,14 +1,14 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const chromatic: Effect = {
-  name: 'chromatic',
+	name: "chromatic",
 
-  defaultParams: {
-    offset: 2.0,
-    angle: 0,
-  },
+	defaultParams: {
+		offset: 2.0,
+		angle: 0,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -43,9 +43,9 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params, _time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, 'u_offset'), params.offset ?? 2.0);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_angle'), params.angle ?? 0);
-    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), resolution[0], resolution[1]);
-  },
+	setUniforms(gl, program, params, _time, resolution) {
+		gl.uniform1f(gl.getUniformLocation(program, "u_offset"), params.offset ?? 2.0);
+		gl.uniform1f(gl.getUniformLocation(program, "u_angle"), params.angle ?? 0);
+		gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+	},
 };

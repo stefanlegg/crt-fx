@@ -1,14 +1,14 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const colorBleed: Effect = {
-  name: 'colorBleed',
+	name: "colorBleed",
 
-  defaultParams: {
-    amount: 0.003,
-    direction: 0,
-  },
+	defaultParams: {
+		amount: 0.003,
+		direction: 0,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -58,9 +58,9 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params, _time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, 'u_amount'), params.amount ?? 0.003);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_direction'), params.direction ?? 0);
-    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), resolution[0], resolution[1]);
-  },
+	setUniforms(gl, program, params, _time, resolution) {
+		gl.uniform1f(gl.getUniformLocation(program, "u_amount"), params.amount ?? 0.003);
+		gl.uniform1f(gl.getUniformLocation(program, "u_direction"), params.direction ?? 0);
+		gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+	},
 };

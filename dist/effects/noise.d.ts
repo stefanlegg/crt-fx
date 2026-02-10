@@ -1,2 +1,2 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 export declare const noise: Effect;

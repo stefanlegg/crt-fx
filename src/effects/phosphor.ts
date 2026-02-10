@@ -1,15 +1,15 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const phosphor: Effect = {
-  name: 'phosphor',
+	name: "phosphor",
 
-  defaultParams: {
-    style: 'shadow-mask',
-    scale: 1.0,
-    intensity: 0.5,
-  },
+	defaultParams: {
+		style: "shadow-mask",
+		scale: 1.0,
+		intensity: 0.5,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -259,23 +259,23 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params, _time, resolution) {
-    const styleMap: Record<string, number> = {
-      'shadow-mask': 0,
-      'aperture-grille': 1,
-      'slot-mask': 2,
-      'cromaclear': 3,
-      'pvm': 4,
-      'arcade': 5,
-      'vga': 6,
-      'composite': 7,
-      'mono-green': 8,
-      'mono-amber': 9,
-    };
-    const styleIdx = styleMap[params.style as string] ?? 0;
-    gl.uniform1i(gl.getUniformLocation(program, 'u_style'), styleIdx);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_scale'), params.scale ?? 1.0);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_intensity'), params.intensity ?? 0.5);
-    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), resolution[0], resolution[1]);
-  },
+	setUniforms(gl, program, params, _time, resolution) {
+		const styleMap: Record<string, number> = {
+			"shadow-mask": 0,
+			"aperture-grille": 1,
+			"slot-mask": 2,
+			cromaclear: 3,
+			pvm: 4,
+			arcade: 5,
+			vga: 6,
+			composite: 7,
+			"mono-green": 8,
+			"mono-amber": 9,
+		};
+		const styleIdx = styleMap[params.style as string] ?? 0;
+		gl.uniform1i(gl.getUniformLocation(program, "u_style"), styleIdx);
+		gl.uniform1f(gl.getUniformLocation(program, "u_scale"), params.scale ?? 1.0);
+		gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), params.intensity ?? 0.5);
+		gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+	},
 };

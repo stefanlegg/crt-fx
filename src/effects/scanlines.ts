@@ -1,16 +1,16 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const scanlines: Effect = {
-  name: 'scanlines',
+	name: "scanlines",
 
-  defaultParams: {
-    intensity: 0.5,
-    count: 800,
-    sharpness: 0.5,
-    phase: 0,
-  },
+	defaultParams: {
+		intensity: 0.5,
+		count: 800,
+		sharpness: 0.5,
+		phase: 0,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -37,11 +37,11 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params, time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, 'u_intensity'), params.intensity ?? 0.5);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_count'), params.count ?? 800);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_sharpness'), params.sharpness ?? 0.5);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_phase'), (params.phase ?? 0) + time * 0.5);
-    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), resolution[0], resolution[1]);
-  },
+	setUniforms(gl, program, params, time, resolution) {
+		gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), params.intensity ?? 0.5);
+		gl.uniform1f(gl.getUniformLocation(program, "u_count"), params.count ?? 800);
+		gl.uniform1f(gl.getUniformLocation(program, "u_sharpness"), params.sharpness ?? 0.5);
+		gl.uniform1f(gl.getUniformLocation(program, "u_phase"), (params.phase ?? 0) + time * 0.5);
+		gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+	},
 };

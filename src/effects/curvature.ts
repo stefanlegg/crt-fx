@@ -1,13 +1,13 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const curvature: Effect = {
-  name: 'curvature',
+	name: "curvature",
 
-  defaultParams: {
-    amount: 0.02,
-  },
+	defaultParams: {
+		amount: 0.02,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -38,7 +38,7 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params) {
-    gl.uniform1f(gl.getUniformLocation(program, 'u_amount'), params.amount ?? 0.02);
-  },
+	setUniforms(gl, program, params) {
+		gl.uniform1f(gl.getUniformLocation(program, "u_amount"), params.amount ?? 0.02);
+	},
 };

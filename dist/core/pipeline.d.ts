@@ -1,4 +1,4 @@
-import type { Effect, MultiPassEffect } from '../types.js';
+import type { Effect, MultiPassEffect } from "../types.js";
 export declare class Pipeline {
     private gl;
     private fbos;

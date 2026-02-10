@@ -11,7 +11,7 @@ export interface MultiPassEffect extends Effect {
     getFragmentShader(passIndex: number): string;
     setPassUniforms(gl: WebGLRenderingContext, program: WebGLProgram, params: Record<string, any>, time: number, resolution: [number, number], passIndex: number): void;
 }
-export type PhosphorStyle = 'shadow-mask' | 'aperture-grille' | 'slot-mask' | 'cromaclear' | 'pvm' | 'arcade' | 'vga' | 'composite' | 'mono-green' | 'mono-amber';
+export type PhosphorStyle = "shadow-mask" | "aperture-grille" | "slot-mask" | "cromaclear" | "pvm" | "arcade" | "vga" | "composite" | "mono-green" | "mono-amber";
 export interface ScanlineParams {
     intensity?: number;
     count?: number;

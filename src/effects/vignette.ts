@@ -1,14 +1,14 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const vignette: Effect = {
-  name: 'vignette',
+	name: "vignette",
 
-  defaultParams: {
-    strength: 0.3,
-    radius: 0.8,
-  },
+	defaultParams: {
+		strength: 0.3,
+		radius: 0.8,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -30,8 +30,8 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params) {
-    gl.uniform1f(gl.getUniformLocation(program, 'u_strength'), params.strength ?? 0.3);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_radius'), params.radius ?? 0.8);
-  },
+	setUniforms(gl, program, params) {
+		gl.uniform1f(gl.getUniformLocation(program, "u_strength"), params.strength ?? 0.3);
+		gl.uniform1f(gl.getUniformLocation(program, "u_radius"), params.radius ?? 0.8);
+	},
 };

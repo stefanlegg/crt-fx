@@ -20,42 +20,42 @@ void main() {
 
 /** Compile a shader from source */
 export function compileShader(
-  gl: WebGLRenderingContext,
-  type: number,
-  source: string,
+	gl: WebGLRenderingContext,
+	type: number,
+	source: string,
 ): WebGLShader {
-  const shader = gl.createShader(type);
-  if (!shader) throw new Error('Failed to create shader');
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const info = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`Shader compile error: ${info}\nSource:\n${source}`);
-  }
-  return shader;
+	const shader = gl.createShader(type);
+	if (!shader) throw new Error("Failed to create shader");
+	gl.shaderSource(shader, source);
+	gl.compileShader(shader);
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+		const info = gl.getShaderInfoLog(shader);
+		gl.deleteShader(shader);
+		throw new Error(`Shader compile error: ${info}\nSource:\n${source}`);
+	}
+	return shader;
 }
 
 /** Link a program from vertex + fragment shaders */
 export function createProgram(
-  gl: WebGLRenderingContext,
-  vertexSource: string,
-  fragmentSource: string,
+	gl: WebGLRenderingContext,
+	vertexSource: string,
+	fragmentSource: string,
 ): WebGLProgram {
-  const vs = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
-  const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-  const program = gl.createProgram();
-  if (!program) throw new Error('Failed to create program');
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const info = gl.getProgramInfoLog(program);
-    gl.deleteProgram(program);
-    throw new Error(`Program link error: ${info}`);
-  }
-  // Shaders can be freed after linking
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-  return program;
+	const vs = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+	const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+	const program = gl.createProgram();
+	if (!program) throw new Error("Failed to create program");
+	gl.attachShader(program, vs);
+	gl.attachShader(program, fs);
+	gl.linkProgram(program);
+	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+		const info = gl.getProgramInfoLog(program);
+		gl.deleteProgram(program);
+		throw new Error(`Program link error: ${info}`);
+	}
+	// Shaders can be freed after linking
+	gl.deleteShader(vs);
+	gl.deleteShader(fs);
+	return program;
 }

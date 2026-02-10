@@ -1,15 +1,15 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const bloom: Effect = {
-  name: 'bloom',
+	name: "bloom",
 
-  defaultParams: {
-    radius: 4,
-    strength: 0.3,
-    threshold: 0.7,
-  },
+	defaultParams: {
+		radius: 4,
+		strength: 0.3,
+		threshold: 0.7,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -61,10 +61,10 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params, _time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, 'u_radius'), params.radius ?? 4);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_strength'), params.strength ?? 0.3);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_threshold'), params.threshold ?? 0.7);
-    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), resolution[0], resolution[1]);
-  },
+	setUniforms(gl, program, params, _time, resolution) {
+		gl.uniform1f(gl.getUniformLocation(program, "u_radius"), params.radius ?? 4);
+		gl.uniform1f(gl.getUniformLocation(program, "u_strength"), params.strength ?? 0.3);
+		gl.uniform1f(gl.getUniformLocation(program, "u_threshold"), params.threshold ?? 0.7);
+		gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+	},
 };

@@ -1,4 +1,4 @@
-import type { ImageSource, CRTOptions } from '../types.js';
+import type { CRTOptions, ImageSource } from "../types.js";
 export declare class Renderer {
     canvas: HTMLCanvasElement;
     gl: WebGLRenderingContext;

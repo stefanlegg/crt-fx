@@ -1,4 +1,4 @@
-import type { CRTOptions, ImageSource } from './types.js';
+import type { CRTOptions, ImageSource } from "./types.js";
 export declare class CRTEffect {
     private renderer;
     constructor(canvas: HTMLCanvasElement, options?: CRTOptions);
@@ -25,8 +25,8 @@ export declare class CRTEffect {
     /** Cleanup all WebGL resources */
     dispose(): void;
 }
-export { presets } from './presets.js';
-export { allEffects } from './effects/index.js';
-export { scanlines, phosphor, chromatic, bloom, vignette, curvature, noise, colorBleed, } from './effects/index.js';
-export { exportBlob, exportDataURL, exportToCanvas } from './export.js';
-export type { CRTOptions, ImageSource, Effect, MultiPassEffect, PhosphorStyle, ScanlineParams, ChromaticParams, BloomParams, PhosphorParams, NoiseParams, VignetteParams, CurvatureParams, ColorBleedParams, } from './types.js';
+export { presets } from "./presets.js";
+export { allEffects } from "./effects/index.js";
+export { scanlines, phosphor, chromatic, bloom, vignette, curvature, noise, colorBleed, } from "./effects/index.js";
+export { exportBlob, exportDataURL, exportToCanvas } from "./export.js";
+export type { CRTOptions, ImageSource, Effect, MultiPassEffect, PhosphorStyle, ScanlineParams, ChromaticParams, BloomParams, PhosphorParams, NoiseParams, VignetteParams, CurvatureParams, ColorBleedParams, } from "./types.js";

@@ -1,236 +1,283 @@
-// src/core/shaders.ts
-var VERTEX_SHADER = `
-attribute vec2 a_position;
-varying vec2 v_texCoord;
-void main() {
-  v_texCoord = a_position * 0.5 + 0.5;
-  gl_Position = vec4(a_position, 0.0, 1.0);
-}
-`;
-var PASSTHROUGH_FRAGMENT = `
+// src/effects/bloom.ts
+var bloom = {
+  name: "bloom",
+  defaultParams: {
+    radius: 4,
+    strength: 0.3,
+    threshold: 0.7
+  },
+  fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
+uniform float u_radius;
+uniform float u_strength;
+uniform float u_threshold;
+uniform vec2 u_resolution;
+
 void main() {
-  gl_FragColor = texture2D(u_texture, v_texCoord);
-}
-`;
-function compileShader(gl, type, source) {
-  const shader = gl.createShader(type);
-  if (!shader)
-    throw new Error("Failed to create shader");
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const info = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`Shader compile error: ${info}
-Source:
-${source}`);
-  }
-  return shader;
-}
-function createProgram(gl, vertexSource, fragmentSource) {
-  const vs = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
-  const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-  const program = gl.createProgram();
-  if (!program)
-    throw new Error("Failed to create program");
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const info = gl.getProgramInfoLog(program);
-    gl.deleteProgram(program);
-    throw new Error(`Program link error: ${info}`);
-  }
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-  return program;
-}
+  vec4 original = texture2D(u_texture, v_texCoord);
+  vec2 texelSize = 1.0 / u_resolution;
 
-// src/core/pipeline.ts
-class Pipeline {
-  gl;
-  fbos = [];
-  passes = [];
-  quadBuffer = null;
-  width = 0;
-  height = 0;
-  constructor(gl) {
-    this.gl = gl;
-    this.setupQuad();
-  }
-  setupQuad() {
-    const gl = this.gl;
-    this.quadBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
-  }
-  createFBO(width, height) {
-    const gl = this.gl;
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    const framebuffer = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    return { framebuffer, texture };
-  }
-  resize(width, height) {
-    if (this.width === width && this.height === height)
-      return;
-    this.width = width;
-    this.height = height;
-    this.destroyFBOs();
-    for (let i = 0;i < 4; i++) {
-      this.fbos.push(this.createFBO(width, height));
-    }
-  }
-  destroyFBOs() {
-    const gl = this.gl;
-    for (const fbo of this.fbos) {
-      gl.deleteFramebuffer(fbo.framebuffer);
-      gl.deleteTexture(fbo.texture);
-    }
-    this.fbos = [];
-  }
-  buildPasses(effects) {
-    const gl = this.gl;
-    for (const p of this.passes) {
-      gl.deleteProgram(p.program);
-    }
-    this.passes = [];
-    for (const effect of effects) {
-      if (isMultiPass(effect)) {
-        for (let i = 0;i < effect.passes; i++) {
-          const frag = effect.getFragmentShader(i);
-          const program = createProgram(gl, VERTEX_SHADER, frag);
-          this.passes.push({ program, effect, passIndex: i });
-        }
-      } else {
-        const program = createProgram(gl, VERTEX_SHADER, effect.fragmentShader);
-        this.passes.push({ program, effect, passIndex: 0 });
-      }
-    }
-  }
-  render(sourceTexture, params, time) {
-    const gl = this.gl;
-    if (this.passes.length === 0 || this.fbos.length < 2)
-      return;
-    const resolution = [this.width, this.height];
-    let inputTexture = sourceTexture;
-    let pingPong = 0;
-    for (let i = 0;i < this.passes.length; i++) {
-      const pass = this.passes[i];
-      const isLast = i === this.passes.length - 1;
-      const effectParams = params[pass.effect.name] || pass.effect.defaultParams;
-      if (isLast) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      } else {
-        const target = this.fbos[pingPong];
-        gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-        gl.viewport(0, 0, this.width, this.height);
-      }
-      gl.useProgram(pass.program);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, inputTexture);
-      const texLoc = gl.getUniformLocation(pass.program, "u_texture");
-      gl.uniform1i(texLoc, 0);
-      if (isMultiPass(pass.effect)) {
-        pass.effect.setPassUniforms(gl, pass.program, effectParams, time, resolution, pass.passIndex);
-      } else {
-        pass.effect.setUniforms(gl, pass.program, effectParams, time, resolution);
-      }
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
-      const posLoc = gl.getAttribLocation(pass.program, "a_position");
-      gl.enableVertexAttribArray(posLoc);
-      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-      if (!isLast) {
-        inputTexture = this.fbos[pingPong].texture;
-        pingPong = (pingPong + 1) % this.fbos.length;
-      }
-    }
-  }
-  renderPassthrough(sourceTexture, passthroughProgram) {
-    const gl = this.gl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.useProgram(passthroughProgram);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
-    gl.uniform1i(gl.getUniformLocation(passthroughProgram, "u_texture"), 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
-    const posLoc = gl.getAttribLocation(passthroughProgram, "a_position");
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }
-  dispose() {
-    const gl = this.gl;
-    this.destroyFBOs();
-    for (const p of this.passes) {
-      gl.deleteProgram(p.program);
-    }
-    this.passes = [];
-    if (this.quadBuffer) {
-      gl.deleteBuffer(this.quadBuffer);
-      this.quadBuffer = null;
-    }
-  }
-}
-function isMultiPass(effect) {
-  return "passes" in effect && typeof effect.passes === "number";
-}
+  // Two-pass gaussian approximation combined in single pass
+  // Sample in a cross/star pattern for efficiency
+  vec3 bloomColor = vec3(0.0);
+  float totalWeight = 0.0;
 
-// src/effects/scanlines.ts
-var scanlines = {
-  name: "scanlines",
+  // Sample radius in texels
+  float r = u_radius;
+
+  for (int i = -12; i <= 12; i++) {
+    for (int j = -12; j <= 12; j++) {
+      float fi = float(i);
+      float fj = float(j);
+      if (abs(fi) > r || abs(fj) > r) continue;
+
+      // Skip corners for diamond/circular pattern (faster)
+      if (fi * fi + fj * fj > r * r) continue;
+
+      vec2 offset = vec2(fi, fj) * texelSize;
+      vec4 samp = texture2D(u_texture, v_texCoord + offset);
+
+      float brightness = dot(samp.rgb, vec3(0.2126, 0.7152, 0.0722));
+      if (brightness < u_threshold) continue;
+
+      float weight = exp(-0.5 * (fi * fi + fj * fj) / (r * r * 0.25 + 0.001));
+      bloomColor += samp.rgb * weight * (brightness - u_threshold);
+      totalWeight += weight;
+    }
+  }
+
+  if (totalWeight > 0.0) {
+    bloomColor /= totalWeight;
+  }
+
+  // Composite bloom onto original
+  vec3 result = original.rgb + bloomColor * u_strength;
+  gl_FragColor = vec4(result, original.a);
+}
+`,
+  setUniforms(gl, program, params, _time, resolution) {
+    gl.uniform1f(gl.getUniformLocation(program, "u_radius"), params.radius ?? 4);
+    gl.uniform1f(gl.getUniformLocation(program, "u_strength"), params.strength ?? 0.3);
+    gl.uniform1f(gl.getUniformLocation(program, "u_threshold"), params.threshold ?? 0.7);
+    gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+  }
+};
+
+// src/effects/chromatic.ts
+var chromatic = {
+  name: "chromatic",
   defaultParams: {
-    intensity: 0.5,
-    count: 800,
-    sharpness: 0.5,
-    phase: 0
+    offset: 2,
+    angle: 0
+  },
+  fragmentShader: `
+precision mediump float;
+varying vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform float u_offset;
+uniform float u_angle;
+uniform vec2 u_resolution;
+
+void main() {
+  // Direction from center to current pixel
+  vec2 center = vec2(0.5);
+  vec2 dir = v_texCoord - center;
+
+  // Offset in pixels, converted to UV space
+  vec2 offsetDir;
+  if (u_angle == 0.0) {
+    offsetDir = normalize(dir + vec2(0.0001));
+  } else {
+    float a = u_angle * 3.14159265 / 180.0;
+    offsetDir = vec2(cos(a), sin(a));
+  }
+
+  vec2 texelSize = 1.0 / u_resolution;
+  vec2 off = offsetDir * u_offset * texelSize;
+
+  // Sample R, G, B at different offsets
+  float r = texture2D(u_texture, v_texCoord + off).r;
+  float g = texture2D(u_texture, v_texCoord).g;
+  float b = texture2D(u_texture, v_texCoord - off).b;
+  float a = texture2D(u_texture, v_texCoord).a;
+
+  gl_FragColor = vec4(r, g, b, a);
+}
+`,
+  setUniforms(gl, program, params, _time, resolution) {
+    gl.uniform1f(gl.getUniformLocation(program, "u_offset"), params.offset ?? 2);
+    gl.uniform1f(gl.getUniformLocation(program, "u_angle"), params.angle ?? 0);
+    gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+  }
+};
+
+// src/effects/color-bleed.ts
+var colorBleed = {
+  name: "colorBleed",
+  defaultParams: {
+    amount: 0.003,
+    direction: 0
+  },
+  fragmentShader: `
+precision mediump float;
+varying vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform float u_amount;
+uniform float u_direction;
+uniform vec2 u_resolution;
+
+void main() {
+  vec4 center = texture2D(u_texture, v_texCoord);
+  vec2 texelSize = 1.0 / u_resolution;
+
+  // Horizontal color bleeding - sample neighbors and smear color
+  float bleedPixels = u_amount * u_resolution.x;
+
+  // Direction: 0 = horizontal (left-to-right), 1 = vertical
+  vec2 dir;
+  if (u_direction < 0.5) {
+    dir = vec2(1.0, 0.0);
+  } else {
+    dir = vec2(0.0, 1.0);
+  }
+
+  // Accumulate weighted color from neighbors (asymmetric - more from left/above)
+  vec3 bleed = center.rgb;
+  float totalWeight = 1.0;
+
+  // Sample previous pixels (trailing bleed)
+  for (int i = 1; i <= 8; i++) {
+    float fi = float(i);
+    if (fi > bleedPixels * 10.0) break;
+
+    float weight = exp(-fi * 0.5 / (bleedPixels * 3.0 + 0.001));
+    vec2 offset = -dir * fi * texelSize;
+    vec3 samp = texture2D(u_texture, v_texCoord + offset).rgb;
+
+    bleed += samp * weight;
+    totalWeight += weight;
+  }
+
+  bleed /= totalWeight;
+
+  // Mix bleeding with original
+  float mixAmt = clamp(u_amount * 10.0, 0.0, 1.0);
+  vec3 result = mix(center.rgb, bleed, mixAmt);
+
+  gl_FragColor = vec4(result, center.a);
+}
+`,
+  setUniforms(gl, program, params, _time, resolution) {
+    gl.uniform1f(gl.getUniformLocation(program, "u_amount"), params.amount ?? 0.003);
+    gl.uniform1f(gl.getUniformLocation(program, "u_direction"), params.direction ?? 0);
+    gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+  }
+};
+
+// src/effects/curvature.ts
+var curvature = {
+  name: "curvature",
+  defaultParams: {
+    amount: 0.02
+  },
+  fragmentShader: `
+precision mediump float;
+varying vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform float u_amount;
+
+vec2 barrelDistortion(vec2 uv, float k) {
+  // Convert to centered coordinates (-1 to 1)
+  vec2 centered = uv * 2.0 - 1.0;
+
+  // Apply barrel distortion
+  float r2 = dot(centered, centered);
+  vec2 distorted = centered * (1.0 + k * r2 + k * k * r2 * r2);
+
+  // Convert back to 0-1 range
+  return distorted * 0.5 + 0.5;
+}
+
+void main() {
+  vec2 uv = barrelDistortion(v_texCoord, u_amount);
+
+  // Black outside the curved screen area
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  gl_FragColor = texture2D(u_texture, uv);
+}
+`,
+  setUniforms(gl, program, params) {
+    gl.uniform1f(gl.getUniformLocation(program, "u_amount"), params.amount ?? 0.02);
+  }
+};
+
+// src/effects/noise.ts
+var noise = {
+  name: "noise",
+  defaultParams: {
+    intensity: 0.05,
+    flickerIntensity: 0.03,
+    speed: 1
   },
   fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
 uniform float u_intensity;
-uniform float u_count;
-uniform float u_sharpness;
-uniform float u_phase;
+uniform float u_flickerIntensity;
+uniform float u_speed;
+uniform float u_time;
 uniform vec2 u_resolution;
+
+// Pseudo-random hash
+float hash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+// Smooth noise
+float noise2d(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f); // smoothstep
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 
 void main() {
   vec4 color = texture2D(u_texture, v_texCoord);
 
-  // Scanline pattern: sine wave along Y axis
-  float y = v_texCoord.y * u_count + u_phase;
-  float scanline = sin(y * 3.14159265) * 0.5 + 0.5;
+  // Animated noise grain
+  float time = u_time * u_speed;
+  vec2 noiseCoord = v_texCoord * u_resolution;
+  float n = hash(noiseCoord + vec2(time * 127.1, time * 311.7));
 
-  // Sharpen the sine wave using pow — higher sharpness = harder edges
-  scanline = pow(scanline, mix(0.5, 4.0, u_sharpness));
+  // Apply noise
+  vec3 grain = vec3(n * 2.0 - 1.0) * u_intensity;
+  color.rgb += grain;
 
-  // Mix between full color and darkened scanline
-  float mask = 1.0 - u_intensity * (1.0 - scanline);
+  // Flicker: global brightness variation
+  float flicker = 1.0 + (hash(vec2(floor(time * 15.0), 0.0)) * 2.0 - 1.0) * u_flickerIntensity;
+  color.rgb *= flicker;
 
-  gl_FragColor = vec4(color.rgb * mask, color.a);
+  gl_FragColor = vec4(clamp(color.rgb, 0.0, 1.0), color.a);
 }
 `,
   setUniforms(gl, program, params, time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), params.intensity ?? 0.5);
-    gl.uniform1f(gl.getUniformLocation(program, "u_count"), params.count ?? 800);
-    gl.uniform1f(gl.getUniformLocation(program, "u_sharpness"), params.sharpness ?? 0.5);
-    gl.uniform1f(gl.getUniformLocation(program, "u_phase"), (params.phase ?? 0) + time * 0.5);
+    gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), params.intensity ?? 0.05);
+    gl.uniform1f(gl.getUniformLocation(program, "u_flickerIntensity"), params.flickerIntensity ?? 0.03);
+    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), params.speed ?? 1);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), time);
     gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
   }
 };
@@ -513,117 +560,46 @@ void main() {
   }
 };
 
-// src/effects/chromatic.ts
-var chromatic = {
-  name: "chromatic",
+// src/effects/scanlines.ts
+var scanlines = {
+  name: "scanlines",
   defaultParams: {
-    offset: 2,
-    angle: 0
+    intensity: 0.5,
+    count: 800,
+    sharpness: 0.5,
+    phase: 0
   },
   fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
-uniform float u_offset;
-uniform float u_angle;
+uniform float u_intensity;
+uniform float u_count;
+uniform float u_sharpness;
+uniform float u_phase;
 uniform vec2 u_resolution;
 
 void main() {
-  // Direction from center to current pixel
-  vec2 center = vec2(0.5);
-  vec2 dir = v_texCoord - center;
+  vec4 color = texture2D(u_texture, v_texCoord);
 
-  // Offset in pixels, converted to UV space
-  vec2 offsetDir;
-  if (u_angle == 0.0) {
-    offsetDir = normalize(dir + vec2(0.0001));
-  } else {
-    float a = u_angle * 3.14159265 / 180.0;
-    offsetDir = vec2(cos(a), sin(a));
-  }
+  // Scanline pattern: sine wave along Y axis
+  float y = v_texCoord.y * u_count + u_phase;
+  float scanline = sin(y * 3.14159265) * 0.5 + 0.5;
 
-  vec2 texelSize = 1.0 / u_resolution;
-  vec2 off = offsetDir * u_offset * texelSize;
+  // Sharpen the sine wave using pow — higher sharpness = harder edges
+  scanline = pow(scanline, mix(0.5, 4.0, u_sharpness));
 
-  // Sample R, G, B at different offsets
-  float r = texture2D(u_texture, v_texCoord + off).r;
-  float g = texture2D(u_texture, v_texCoord).g;
-  float b = texture2D(u_texture, v_texCoord - off).b;
-  float a = texture2D(u_texture, v_texCoord).a;
+  // Mix between full color and darkened scanline
+  float mask = 1.0 - u_intensity * (1.0 - scanline);
 
-  gl_FragColor = vec4(r, g, b, a);
+  gl_FragColor = vec4(color.rgb * mask, color.a);
 }
 `,
-  setUniforms(gl, program, params, _time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, "u_offset"), params.offset ?? 2);
-    gl.uniform1f(gl.getUniformLocation(program, "u_angle"), params.angle ?? 0);
-    gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
-  }
-};
-
-// src/effects/bloom.ts
-var bloom = {
-  name: "bloom",
-  defaultParams: {
-    radius: 4,
-    strength: 0.3,
-    threshold: 0.7
-  },
-  fragmentShader: `
-precision mediump float;
-varying vec2 v_texCoord;
-uniform sampler2D u_texture;
-uniform float u_radius;
-uniform float u_strength;
-uniform float u_threshold;
-uniform vec2 u_resolution;
-
-void main() {
-  vec4 original = texture2D(u_texture, v_texCoord);
-  vec2 texelSize = 1.0 / u_resolution;
-
-  // Two-pass gaussian approximation combined in single pass
-  // Sample in a cross/star pattern for efficiency
-  vec3 bloomColor = vec3(0.0);
-  float totalWeight = 0.0;
-
-  // Sample radius in texels
-  float r = u_radius;
-
-  for (int i = -12; i <= 12; i++) {
-    for (int j = -12; j <= 12; j++) {
-      float fi = float(i);
-      float fj = float(j);
-      if (abs(fi) > r || abs(fj) > r) continue;
-
-      // Skip corners for diamond/circular pattern (faster)
-      if (fi * fi + fj * fj > r * r) continue;
-
-      vec2 offset = vec2(fi, fj) * texelSize;
-      vec4 samp = texture2D(u_texture, v_texCoord + offset);
-
-      float brightness = dot(samp.rgb, vec3(0.2126, 0.7152, 0.0722));
-      if (brightness < u_threshold) continue;
-
-      float weight = exp(-0.5 * (fi * fi + fj * fj) / (r * r * 0.25 + 0.001));
-      bloomColor += samp.rgb * weight * (brightness - u_threshold);
-      totalWeight += weight;
-    }
-  }
-
-  if (totalWeight > 0.0) {
-    bloomColor /= totalWeight;
-  }
-
-  // Composite bloom onto original
-  vec3 result = original.rgb + bloomColor * u_strength;
-  gl_FragColor = vec4(result, original.a);
-}
-`,
-  setUniforms(gl, program, params, _time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, "u_radius"), params.radius ?? 4);
-    gl.uniform1f(gl.getUniformLocation(program, "u_strength"), params.strength ?? 0.3);
-    gl.uniform1f(gl.getUniformLocation(program, "u_threshold"), params.threshold ?? 0.7);
+  setUniforms(gl, program, params, time, resolution) {
+    gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), params.intensity ?? 0.5);
+    gl.uniform1f(gl.getUniformLocation(program, "u_count"), params.count ?? 800);
+    gl.uniform1f(gl.getUniformLocation(program, "u_sharpness"), params.sharpness ?? 0.5);
+    gl.uniform1f(gl.getUniformLocation(program, "u_phase"), (params.phase ?? 0) + time * 0.5);
     gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
   }
 };
@@ -662,175 +638,6 @@ void main() {
   }
 };
 
-// src/effects/curvature.ts
-var curvature = {
-  name: "curvature",
-  defaultParams: {
-    amount: 0.02
-  },
-  fragmentShader: `
-precision mediump float;
-varying vec2 v_texCoord;
-uniform sampler2D u_texture;
-uniform float u_amount;
-
-vec2 barrelDistortion(vec2 uv, float k) {
-  // Convert to centered coordinates (-1 to 1)
-  vec2 centered = uv * 2.0 - 1.0;
-
-  // Apply barrel distortion
-  float r2 = dot(centered, centered);
-  vec2 distorted = centered * (1.0 + k * r2 + k * k * r2 * r2);
-
-  // Convert back to 0-1 range
-  return distorted * 0.5 + 0.5;
-}
-
-void main() {
-  vec2 uv = barrelDistortion(v_texCoord, u_amount);
-
-  // Black outside the curved screen area
-  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-    return;
-  }
-
-  gl_FragColor = texture2D(u_texture, uv);
-}
-`,
-  setUniforms(gl, program, params) {
-    gl.uniform1f(gl.getUniformLocation(program, "u_amount"), params.amount ?? 0.02);
-  }
-};
-
-// src/effects/noise.ts
-var noise = {
-  name: "noise",
-  defaultParams: {
-    intensity: 0.05,
-    flickerIntensity: 0.03,
-    speed: 1
-  },
-  fragmentShader: `
-precision mediump float;
-varying vec2 v_texCoord;
-uniform sampler2D u_texture;
-uniform float u_intensity;
-uniform float u_flickerIntensity;
-uniform float u_speed;
-uniform float u_time;
-uniform vec2 u_resolution;
-
-// Pseudo-random hash
-float hash(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-
-// Smooth noise
-float noise2d(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f); // smoothstep
-  float a = hash(i);
-  float b = hash(i + vec2(1.0, 0.0));
-  float c = hash(i + vec2(0.0, 1.0));
-  float d = hash(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-void main() {
-  vec4 color = texture2D(u_texture, v_texCoord);
-
-  // Animated noise grain
-  float time = u_time * u_speed;
-  vec2 noiseCoord = v_texCoord * u_resolution;
-  float n = hash(noiseCoord + vec2(time * 127.1, time * 311.7));
-
-  // Apply noise
-  vec3 grain = vec3(n * 2.0 - 1.0) * u_intensity;
-  color.rgb += grain;
-
-  // Flicker: global brightness variation
-  float flicker = 1.0 + (hash(vec2(floor(time * 15.0), 0.0)) * 2.0 - 1.0) * u_flickerIntensity;
-  color.rgb *= flicker;
-
-  gl_FragColor = vec4(clamp(color.rgb, 0.0, 1.0), color.a);
-}
-`,
-  setUniforms(gl, program, params, time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), params.intensity ?? 0.05);
-    gl.uniform1f(gl.getUniformLocation(program, "u_flickerIntensity"), params.flickerIntensity ?? 0.03);
-    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), params.speed ?? 1);
-    gl.uniform1f(gl.getUniformLocation(program, "u_time"), time);
-    gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
-  }
-};
-
-// src/effects/color-bleed.ts
-var colorBleed = {
-  name: "colorBleed",
-  defaultParams: {
-    amount: 0.003,
-    direction: 0
-  },
-  fragmentShader: `
-precision mediump float;
-varying vec2 v_texCoord;
-uniform sampler2D u_texture;
-uniform float u_amount;
-uniform float u_direction;
-uniform vec2 u_resolution;
-
-void main() {
-  vec4 center = texture2D(u_texture, v_texCoord);
-  vec2 texelSize = 1.0 / u_resolution;
-
-  // Horizontal color bleeding - sample neighbors and smear color
-  float bleedPixels = u_amount * u_resolution.x;
-
-  // Direction: 0 = horizontal (left-to-right), 1 = vertical
-  vec2 dir;
-  if (u_direction < 0.5) {
-    dir = vec2(1.0, 0.0);
-  } else {
-    dir = vec2(0.0, 1.0);
-  }
-
-  // Accumulate weighted color from neighbors (asymmetric - more from left/above)
-  vec3 bleed = center.rgb;
-  float totalWeight = 1.0;
-
-  // Sample previous pixels (trailing bleed)
-  for (int i = 1; i <= 8; i++) {
-    float fi = float(i);
-    if (fi > bleedPixels * 10.0) break;
-
-    float weight = exp(-fi * 0.5 / (bleedPixels * 3.0 + 0.001));
-    vec2 offset = -dir * fi * texelSize;
-    vec3 samp = texture2D(u_texture, v_texCoord + offset).rgb;
-
-    bleed += samp * weight;
-    totalWeight += weight;
-  }
-
-  bleed /= totalWeight;
-
-  // Mix bleeding with original
-  float mixAmt = clamp(u_amount * 10.0, 0.0, 1.0);
-  vec3 result = mix(center.rgb, bleed, mixAmt);
-
-  gl_FragColor = vec4(result, center.a);
-}
-`,
-  setUniforms(gl, program, params, _time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, "u_amount"), params.amount ?? 0.003);
-    gl.uniform1f(gl.getUniformLocation(program, "u_direction"), params.direction ?? 0);
-    gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
-  }
-};
-
 // src/effects/index.ts
 var allEffects = [
   curvature,
@@ -842,6 +649,199 @@ var allEffects = [
   bloom,
   vignette
 ];
+
+// src/core/shaders.ts
+var VERTEX_SHADER = `
+attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}
+`;
+var PASSTHROUGH_FRAGMENT = `
+precision mediump float;
+varying vec2 v_texCoord;
+uniform sampler2D u_texture;
+void main() {
+  gl_FragColor = texture2D(u_texture, v_texCoord);
+}
+`;
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  if (!shader)
+    throw new Error("Failed to create shader");
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const info = gl.getShaderInfoLog(shader);
+    gl.deleteShader(shader);
+    throw new Error(`Shader compile error: ${info}
+Source:
+${source}`);
+  }
+  return shader;
+}
+function createProgram(gl, vertexSource, fragmentSource) {
+  const vs = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+  const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+  const program = gl.createProgram();
+  if (!program)
+    throw new Error("Failed to create program");
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const info = gl.getProgramInfoLog(program);
+    gl.deleteProgram(program);
+    throw new Error(`Program link error: ${info}`);
+  }
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  return program;
+}
+
+// src/core/pipeline.ts
+class Pipeline {
+  gl;
+  fbos = [];
+  passes = [];
+  quadBuffer = null;
+  width = 0;
+  height = 0;
+  constructor(gl) {
+    this.gl = gl;
+    this.setupQuad();
+  }
+  setupQuad() {
+    const gl = this.gl;
+    this.quadBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+  }
+  createFBO(width, height) {
+    const gl = this.gl;
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return { framebuffer, texture };
+  }
+  resize(width, height) {
+    if (this.width === width && this.height === height)
+      return;
+    this.width = width;
+    this.height = height;
+    this.destroyFBOs();
+    for (let i = 0;i < 4; i++) {
+      this.fbos.push(this.createFBO(width, height));
+    }
+  }
+  destroyFBOs() {
+    const gl = this.gl;
+    for (const fbo of this.fbos) {
+      gl.deleteFramebuffer(fbo.framebuffer);
+      gl.deleteTexture(fbo.texture);
+    }
+    this.fbos = [];
+  }
+  buildPasses(effects) {
+    const gl = this.gl;
+    for (const p of this.passes) {
+      gl.deleteProgram(p.program);
+    }
+    this.passes = [];
+    for (const effect of effects) {
+      if (isMultiPass(effect)) {
+        for (let i = 0;i < effect.passes; i++) {
+          const frag = effect.getFragmentShader(i);
+          const program = createProgram(gl, VERTEX_SHADER, frag);
+          this.passes.push({ program, effect, passIndex: i });
+        }
+      } else {
+        const program = createProgram(gl, VERTEX_SHADER, effect.fragmentShader);
+        this.passes.push({ program, effect, passIndex: 0 });
+      }
+    }
+  }
+  render(sourceTexture, params, time) {
+    const gl = this.gl;
+    if (this.passes.length === 0 || this.fbos.length < 2)
+      return;
+    const resolution = [this.width, this.height];
+    let inputTexture = sourceTexture;
+    let pingPong = 0;
+    for (let i = 0;i < this.passes.length; i++) {
+      const pass = this.passes[i];
+      const isLast = i === this.passes.length - 1;
+      const effectParams = params[pass.effect.name] || pass.effect.defaultParams;
+      if (isLast) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      } else {
+        const target = this.fbos[pingPong];
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+        gl.viewport(0, 0, this.width, this.height);
+      }
+      gl.useProgram(pass.program);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, inputTexture);
+      const texLoc = gl.getUniformLocation(pass.program, "u_texture");
+      gl.uniform1i(texLoc, 0);
+      if (isMultiPass(pass.effect)) {
+        pass.effect.setPassUniforms(gl, pass.program, effectParams, time, resolution, pass.passIndex);
+      } else {
+        pass.effect.setUniforms(gl, pass.program, effectParams, time, resolution);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+      const posLoc = gl.getAttribLocation(pass.program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      if (!isLast) {
+        inputTexture = this.fbos[pingPong].texture;
+        pingPong = (pingPong + 1) % this.fbos.length;
+      }
+    }
+  }
+  renderPassthrough(sourceTexture, passthroughProgram) {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.useProgram(passthroughProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+    gl.uniform1i(gl.getUniformLocation(passthroughProgram, "u_texture"), 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+    const posLoc = gl.getAttribLocation(passthroughProgram, "a_position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+  dispose() {
+    const gl = this.gl;
+    this.destroyFBOs();
+    for (const p of this.passes) {
+      gl.deleteProgram(p.program);
+    }
+    this.passes = [];
+    if (this.quadBuffer) {
+      gl.deleteBuffer(this.quadBuffer);
+      this.quadBuffer = null;
+    }
+  }
+}
+function isMultiPass(effect) {
+  return "passes" in effect && typeof effect.passes === "number";
+}
 
 // src/core/renderer.ts
 class Renderer {
@@ -1254,4 +1254,4 @@ export {
   CRTEffect
 };
 
-//# debugId=2FEC87DB4BF4FAEF64756E2164756E21
+//# debugId=597E2548DA975F2264756E2164756E21

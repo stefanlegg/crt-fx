@@ -1,15 +1,15 @@
-import type { Effect } from '../types.js';
+import type { Effect } from "../types.js";
 
 export const noise: Effect = {
-  name: 'noise',
+	name: "noise",
 
-  defaultParams: {
-    intensity: 0.05,
-    flickerIntensity: 0.03,
-    speed: 1.0,
-  },
+	defaultParams: {
+		intensity: 0.05,
+		flickerIntensity: 0.03,
+		speed: 1.0,
+	},
 
-  fragmentShader: `
+	fragmentShader: `
 precision mediump float;
 varying vec2 v_texCoord;
 uniform sampler2D u_texture;
@@ -58,14 +58,14 @@ void main() {
 }
 `,
 
-  setUniforms(gl, program, params, time, resolution) {
-    gl.uniform1f(gl.getUniformLocation(program, 'u_intensity'), params.intensity ?? 0.05);
-    gl.uniform1f(
-      gl.getUniformLocation(program, 'u_flickerIntensity'),
-      params.flickerIntensity ?? 0.03,
-    );
-    gl.uniform1f(gl.getUniformLocation(program, 'u_speed'), params.speed ?? 1.0);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_time'), time);
-    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), resolution[0], resolution[1]);
-  },
+	setUniforms(gl, program, params, time, resolution) {
+		gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), params.intensity ?? 0.05);
+		gl.uniform1f(
+			gl.getUniformLocation(program, "u_flickerIntensity"),
+			params.flickerIntensity ?? 0.03,
+		);
+		gl.uniform1f(gl.getUniformLocation(program, "u_speed"), params.speed ?? 1.0);
+		gl.uniform1f(gl.getUniformLocation(program, "u_time"), time);
+		gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), resolution[0], resolution[1]);
+	},
 };

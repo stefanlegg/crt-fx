@@ -1,21 +1,51 @@
 {
-  "name": "crt-fx",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "files": ["dist"],
-  "scripts": {
-    "build": "bun run build.ts",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "typescript": "^5.8.3"
-  }
+	"name": "crt-fx",
+	"version": "1.0.0",
+	"description": "WebGL shader-based CRT monitor effects for images. Scanlines, phosphor masks, chromatic aberration, bloom, and more.",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "bun run build.ts",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"check": "biome check --write .",
+		"test": "bun test"
+	},
+	"keywords": [
+		"crt",
+		"retro",
+		"shader",
+		"webgl",
+		"filter",
+		"scanlines",
+		"phosphor",
+		"chromatic-aberration",
+		"bloom",
+		"vignette",
+		"image-processing"
+	],
+	"author": "Stefan Legg",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/stefanlegg/crt-fx.git"
+	},
+	"bugs": {
+		"url": "https://github.com/stefanlegg/crt-fx/issues"
+	},
+	"homepage": "https://github.com/stefanlegg/crt-fx#readme",
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/bun": "^1.3.8",
+		"typescript": "^5.8.3"
+	}
 }

@@ -1,12 +1,12 @@
 import { $ } from "bun";
 
 await Bun.build({
-  entrypoints: ["./src/index.ts"],
-  outdir: "./dist",
-  format: "esm",
-  target: "browser",
-  minify: false,
-  sourcemap: "external",
+	entrypoints: ["./src/index.ts"],
+	outdir: "./dist",
+	format: "esm",
+	target: "browser",
+	minify: false,
+	sourcemap: "external",
 });
 
 // Generate declaration files
